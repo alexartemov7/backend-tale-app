@@ -1,8 +1,9 @@
+import 'dotenv/config'
+
 import express from "express"
 import cors from 'cors'
 import { MongoClient, ObjectId } from 'mongodb'
 
-import 'dotenv/config'
 
 const app = express()
 app.use(cors())

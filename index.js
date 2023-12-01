@@ -25,7 +25,7 @@ app.get('/stories/genre/:genre', async (req, res) => {
     try {
       // Fetch stories with the specified genre
       const genreStoriesCursor = stories.find({ genre: req.params.genre });
-      const genreStories = await genreStoriesCursor.ntoArray();
+      const genreStories = await genreStoriesCursor.toArray();
   
       // Enhanced logic to fetch author details for each story
       const formattedStories = await Promise.all(genreStories.map(async (story) => {

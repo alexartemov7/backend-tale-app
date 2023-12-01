@@ -49,43 +49,30 @@ app.get('/stories/genre/:genre', async (req, res) => {
   
 //get all chapters within one story
 
-  app.get('/stories/:storyId/chapters', async (req, res) => {
+app.get('/stories/:storyId/chapters', async (req, res) => {
     const db = client.db('tale-together');
     const stories = db.collection('stories');
-    const users = db.collection('users');
-  
+
     try {
-      // Fetch the story by its ID
-      const story = await stories.findOne({ _id: req.params.storyId });
-  
-      if (!story) {
-        res.status(404).send('Story not found');
-      } else {
-        // Enhance chapters with author details
-        const chaptersWithAuthorDetails = await Promise.all(
-          story.chapters.map(async (chapter) => {
-            const author = await users.findOne({ _id: chapter.author });
-            return {
-              title: chapter.title,
-              description: chapter.description,
-              content: chapter.content,
-              illustration: chapter.illustration,
-              author: author ? {
-                username: author.username,
-                profilePicture: author.profilePicture
-              } : null
-            };
-          })
-        );
-  
-        res.json(chaptersWithAuthorDetails);
-      }
+        // Convert the storyId from string to ObjectId
+        const storyId = new ObjectId(req.params.storyId);
+
+        // Fetch the story by its _id
+        const story = await stories.findOne({ _id: storyId });
+
+        if (!story) {
+            return res.status(404).send('Story not found');
+        } 
+
+        // Respond with just the chapters
+        res.json(story.chapters);
     } catch (error) {
-      console.error('Error fetching chapters for story:', error);
-      res.status(500).send('Error fetching chapters');
+        console.error('Error fetching chapters for story by _id:', error);
+        res.status(500).send('Error fetching chapters');
     }
-  });
-  
+});
+
+
   //adding a whole story
 
   app.post('/stories', async (req, res) => {

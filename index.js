@@ -21,11 +21,11 @@ app.get('/stories/genre/:genre', async (req, res) => {
     const db = client.db('tale-together');
     const stories = db.collection('stories');
     const users = db.collection('users');
-  
+
     try {
       // Fetch stories with the specified genre
       const genreStoriesCursor = stories.find({ genre: req.params.genre });
-      const genreStories = await genreStoriesCursor.toArray();
+      const genreStories = await genreStoriesCursor.ntoArray();
   
       // Enhanced logic to fetch author details for each story
       const formattedStories = await Promise.all(genreStories.map(async (story) => {

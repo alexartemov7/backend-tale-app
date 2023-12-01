@@ -115,7 +115,7 @@ app.get('/stories/genre/:genre', async (req, res) => {
   });
   
 
-  //adding a new chapter to the story upon request
+  //adding a new chapter to a particular story 
 
   app.post('/stories/:storyId/chapters', async (req, res) => {
     const db = client.db('tale-together');
@@ -144,6 +144,44 @@ app.get('/stories/genre/:genre', async (req, res) => {
     } catch (error) {
       console.error('Error adding chapter to story:', error);
       res.status(500).send('Error adding chapter to the story');
+    }
+  });
+  
+  // adding a whole new story with 3 chapters inside 
+
+  app.post('/stories/with-chapters', async (req, res) => {
+    const db = client.db('tale-together');
+    const stories = db.collection('stories');
+  
+    try {
+      // Construct the new story with chapters
+      const newStory = {
+        title: req.body.title,
+        description: req.body.description,
+        genre: req.body.genre,
+        authors: req.body.authors, // Array of ObjectIds representing authors
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        illustration: req.body.illustration, // URL or reference to the story's illustration
+        chapters: req.body.chapters.map(chapter => ({ // Map through chapters array to format it
+          chapterId: new ObjectId(),
+          title: chapter.title,
+          description: chapter.description,
+          content: chapter.content,
+          author: chapter.author, // ObjectId of the author from 'users' collection
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          illustration: chapter.illustration // URL or reference to the chapter's illustration
+        }))
+      };
+  
+      // Insert the new story with chapters into the database
+      await stories.insertOne(newStory);
+  
+      res.status(201).send('Story with chapters added successfully');
+    } catch (error) {
+      console.error('Error adding new story with chapters:', error);
+      res.status(500).send('Error adding new story with chapters');
     }
   });
   

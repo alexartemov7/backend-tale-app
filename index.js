@@ -10,17 +10,7 @@ app.use(cors())
 app.use(express.json())
 
 const client = new MongoClient(process.env.MONGO_URI)
-async function connectToMongo() {
-    try {
-        await client.connect();
-        console.log('Connected to Mongo');
-    } catch (error) {
-        console.error('Connection to Mongo failed:', error);
-    }
-}
-
-connectToMongo();
-
+client.connect()
 console.log('Connected to Mongo')
 const PORT = process.env.PORT
 

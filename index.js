@@ -12,7 +12,7 @@ app.use(express.json())
 const client = new MongoClient(process.env.MONGO_URI)
 client.connect()
 console.log('Connected to Mongo')
-const PORT = process.env.PORT
+const PORT = process.env.PORT 
 
 app.listen(PORT, () => console.log(`API listening on port ${process.env.PORT}`))
 
@@ -59,7 +59,7 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
         const storyId = new ObjectId(req.params.storyId);
 
         // Fetch the story by its _id
-        const story = await stories.findOne({ _id: storyId });
+        const story = await stories.findOne({ _id: storyId }); 
 
         if (!story) {
             return res.status(404).send('Story not found');
@@ -135,4 +135,40 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
     }
   });
   
+  // adding a whole new story with 3 chapters inside 
+
+  app.post('/stories/with-chapters', async (req, res) => {
+    const db = client.db('tale-together');
+    const stories = db.collection('stories');
   
+    try {
+      // Construct the new story with chapters
+      const newStory = {
+        title: req.body.title,
+        description: req.body.description,
+        genre: req.body.genre,
+        authors: req.body.authors, // Array of ObjectIds representing authors
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        illustration: req.body.illustration, // URL or reference to the story's illustration
+        chapters: req.body.chapters.map(chapter => ({ // Map through chapters array to format it
+          chapterId: new ObjectId(),
+          title: chapter.title,
+          description: chapter.description,
+          content: chapter.content,
+          author: chapter.author, // ObjectId of the author from 'users' collection
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          illustration: chapter.illustration // URL or reference to the chapter's illustration
+        }))
+      };
+  
+      // Insert the new story with chapters into the database
+      await stories.insertOne(newStory);
+  
+      res.status(201).send('Story with chapters added successfully');
+    } catch (error) {
+      console.error('Error adding new story with chapters:', error);
+      res.status(500).send('Error adding new story with chapters');
+    }
+  });

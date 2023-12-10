@@ -3,7 +3,13 @@ import 'dotenv/config'
 import express from "express"
 import cors from 'cors'
 import { MongoClient, ObjectId } from 'mongodb'
+import OpenAI from 'openai';
+const { OPENAI_KEY } = process.env;
 
+
+  const openai = new OpenAI({
+    apiKey: '' // This is also the default, can be omitted
+});
 
 const app = express()
 app.use(cors())
@@ -16,37 +22,100 @@ const PORT = process.env.PORT
 
 app.listen(PORT, () => console.log(`API listening on port ${process.env.PORT}`))
 
+
+async function createImage (prompt) {
+    try {
+        const response = await openai.images.generate({
+            model: "dall-e-3",
+            prompt: prompt,
+            n: 1,
+            size: "1024x1024",
+          });  
+         return response.data[0].url 
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+app.post('/stories/generate',async(req,res)=>{
+    const {storyId} = req.body 
+    const stories = client.db('tale-together').collection('stories');
+    const thisStory = await stories.findOne({title:storyId})
+    console.log(thisStory)
+    const storyImg =  await  createImage(thisStory.description)
+    console.log(storyImg)
+    await stories.updateOne({title: storyId},{$set: {illustration:storyImg}})
+    res.send({img:storyImg})
+})
+
 //get access to all stories on page with a full list of stories by genre
+
+
+app.get('/stories', async (req, res) => {
+    const db = client.db('tale-together');
+    const stories = db.collection('stories');
+    const users = db.collection('users'); 
+    try {
+        // Fetch all stories
+        const allStories = await stories.find({}).toArray();
+
+        const storiesWithUserDetails = await Promise.all(
+            allStories.map(async (story) => {
+                // Fetch user details for each story
+                const userDetails = await Promise.all(
+                    story.users.map(async (userId) => {
+                        const user = await users.findOne({ _id: userId });//use new ObjectId
+                        return user ? {
+                            // Add the user details you want to show
+                            username: user.username,
+                            profilePicture: user.profilePicture
+                        } : null;
+                    })
+                );
+
+                return {
+                    _id: story._id,
+                    title: story.title,
+                    genre: story.genre,
+                    description: story.description,
+                    users: userDetails.filter(user => user !== null), // Filter out null values
+                    illustration: story.illustration
+                };
+            })
+        );
+
+        res.json(storiesWithUserDetails);
+    } catch (error) {
+        console.error('Error fetching stories:', error);
+        res.status(500).send('Error fetching stories');
+    }
+});
+
+//get all stories by genre
 
 app.get('/stories/genre/:genre', async (req, res) => {
     const db = client.db('tale-together');
     const stories = db.collection('stories');
-    const users = db.collection('users');
 
     try {
-      // Fetch stories with the specified genre
-      const genreStoriesCursor = stories.find({ genre: req.params.genre });
-      const genreStories = await genreStoriesCursor.toArray();
-  
-      // Enhanced logic to fetch author details for each story
-      const formattedStories = await Promise.all(genreStories.map(async (story) => {
-        const authorDetails = await Promise.all(story.authors.map(async (authorId) => {
-          const author = await users.findOne({ _id: authorId });
-          return author ? { username: author.username, profilePicture: author.profilePicture } : null;
-        }));
-  
-        return {
-          ...story,
-          authors: authorDetails.filter(author => author !== null)
-        };
-      }));
-  
-      res.json(formattedStories);
+        // Fetch stories that match the genre
+        const genre = req.params.genre;
+        const genreStories = await stories.find({ genre: genre }, {
+            projection: { title: 1, description: 1, illustration: 1, users: 1 }
+        }).toArray();
+
+        if (genreStories.length === 0) {
+            return res.status(404).send('No stories found for this genre');
+        }
+
+        // Send the response with stories data
+        res.json(genreStories);
     } catch (error) {
-      console.error('Error fetching stories by genre:', error);
-      res.status(500).send('Error fetching stories');
+        console.error('Error fetching stories by genre:', error);
+        res.status(500).send('Error fetching stories');
     }
-  });
+});
+
   
 //get all chapters within one story
 
@@ -73,39 +142,9 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
     }
 });
 
-
-  //adding a whole story
-
-  app.post('/stories', async (req, res) => {
-    const db = client.db('tale-together');
-    const stories = db.collection('stories');
-  
-    try {
-      const newStory = {
-        title: req.body.title,
-        description: req.body.description,
-        genre: req.body.genre,
-        authors: req.body.authors, // Array of ObjectIds representing authors
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        illustration: req.body.illustration, // URL or reference to the story's illustration
-        chapters: [] // Initially empty, chapters are added separately
-      };
-  
-      // Insert the new story into the database
-      await stories.insertOne(newStory);
-  
-      res.status(201).send('Story added successfully');
-    } catch (error) {
-      console.error('Error adding new story:', error);
-      res.status(500).send('Error adding new story');
-    }
-  });
-  
-
   //adding a new chapter to a particular story 
 
-  app.post('/stories/:storyId/chapters', async (req, res) => {
+  app.post('/stories/chapters/:storyId', async (req, res) => {
     const db = client.db('tale-together');
     const stories = db.collection('stories');
   
@@ -115,11 +154,9 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
         chapterId: new ObjectId(), // Generating a new ObjectId for the chapter
         title: req.body.title,
         description: req.body.description,
-        content: req.body.content,
-        author: req.body.author, // This should be the ObjectId of the author from 'users' collection
+        content: req.body.content, 
         createdAt: new Date(),
-        updatedAt: new Date(),
-        illustration: req.body.illustration // URL or reference to the chapter's illustration
+        updatedAt: new Date() 
       };
   
       // Add the new chapter to the story
@@ -132,43 +169,5 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
     } catch (error) {
       console.error('Error adding chapter to story:', error);
       res.status(500).send('Error adding chapter to the story');
-    }
-  });
-  
-  // adding a whole new story with 3 chapters inside 
-
-  app.post('/stories/with-chapters', async (req, res) => {
-    const db = client.db('tale-together');
-    const stories = db.collection('stories');
-  
-    try {
-      // Construct the new story with chapters
-      const newStory = {
-        title: req.body.title,
-        description: req.body.description,
-        genre: req.body.genre,
-        authors: req.body.authors, // Array of ObjectIds representing authors
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        illustration: req.body.illustration, // URL or reference to the story's illustration
-        chapters: req.body.chapters.map(chapter => ({ // Map through chapters array to format it
-          chapterId: new ObjectId(),
-          title: chapter.title,
-          description: chapter.description,
-          content: chapter.content,
-          author: chapter.author, // ObjectId of the author from 'users' collection
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          illustration: chapter.illustration // URL or reference to the chapter's illustration
-        }))
-      };
-  
-      // Insert the new story with chapters into the database
-      await stories.insertOne(newStory);
-  
-      res.status(201).send('Story with chapters added successfully');
-    } catch (error) {
-      console.error('Error adding new story with chapters:', error);
-      res.status(500).send('Error adding new story with chapters');
     }
   });

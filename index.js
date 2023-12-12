@@ -44,9 +44,11 @@ app.post('/stories/generate',async(req,res)=>{
     console.log(thisStory)
     const storyImg =  await  createImage(thisStory.description)
     console.log(storyImg)
-    await stories.updateOne({title: storyId},{$set: {illustration:storyImg}})
+    await stories.updateOne({title: storyId},{$set: {illustration:storyImg}}) 
     res.send({img:storyImg})
 })
+
+app.post('')
 
 //get access to all stories on page with a full list of stories by genre
 
@@ -61,12 +63,11 @@ app.get('/stories', async (req, res) => {
 
         const storiesWithUserDetails = await Promise.all(
             allStories.map(async (story) => {
-                // Fetch user details for each story
                 const userDetails = await Promise.all(
                     story.users.map(async (userId) => {
-                        const user = await users.findOne({ _id: userId });//use new ObjectId
+                        const user = await users.findOne({ _id: userId });
                         return user ? {
-                            // Add the user details you want to show
+                            
                             username: user.username,
                             profilePicture: user.profilePicture
                         } : null;
@@ -78,7 +79,7 @@ app.get('/stories', async (req, res) => {
                     title: story.title,
                     genre: story.genre,
                     description: story.description,
-                    users: userDetails.filter(user => user !== null), // Filter out null values
+                    users: userDetails.filter(user => user !== null), 
                     illustration: story.illustration
                 };
             })
@@ -91,14 +92,12 @@ app.get('/stories', async (req, res) => {
     }
 });
 
-//get all stories by genre
 
 app.get('/stories/genre/:genre', async (req, res) => {
     const db = client.db('tale-together');
     const stories = db.collection('stories');
 
     try {
-        // Fetch stories that match the genre
         const genre = req.params.genre;
         const genreStories = await stories.find({ genre: genre }, {
             projection: { title: 1, description: 1, illustration: 1, users: 1 }
@@ -108,7 +107,6 @@ app.get('/stories/genre/:genre', async (req, res) => {
             return res.status(404).send('No stories found for this genre');
         }
 
-        // Send the response with stories data
         res.json(genreStories);
     } catch (error) {
         console.error('Error fetching stories by genre:', error);
@@ -117,24 +115,20 @@ app.get('/stories/genre/:genre', async (req, res) => {
 });
 
   
-//get all chapters within one story
 
 app.get('/stories/:storyId/chapters', async (req, res) => {
     const db = client.db('tale-together');
     const stories = db.collection('stories');
 
     try {
-        // Convert the storyId from string to ObjectId
         const storyId = new ObjectId(req.params.storyId);
 
-        // Fetch the story by its _id
         const story = await stories.findOne({ _id: storyId }); 
 
         if (!story) {
             return res.status(404).send('Story not found');
         } 
 
-        // Respond with just the chapters
         res.json(story.chapters);
     } catch (error) {
         console.error('Error fetching chapters for story by _id:', error);
@@ -142,7 +136,6 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
     }
 });
 
-  //adding a new chapter to a particular story 
 
   app.post('/stories/chapters/:storyId', async (req, res) => {
     const db = client.db('tale-together');
@@ -151,15 +144,14 @@ app.get('/stories/:storyId/chapters', async (req, res) => {
     try {
       const storyId = req.params.storyId;
       const newChapter = {
-        chapterId: new ObjectId(), // Generating a new ObjectId for the chapter
+        chapterId: new ObjectId(), 
         title: req.body.title,
         description: req.body.description,
-        content: req.body.content, 
+        content: req.body.content,
         createdAt: new Date(),
         updatedAt: new Date() 
       };
   
-      // Add the new chapter to the story
       await stories.updateOne(
         { _id: new ObjectId(storyId) },
         { $push: { chapters: newChapter } }
